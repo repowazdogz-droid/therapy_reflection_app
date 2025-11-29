@@ -819,7 +819,7 @@ export const TherapyReflectionApp: React.FC = () => {
   <p className="tra-section-body">
     If this space is helpful and you&apos;d like deeper support, you can unlock Therapy Reflection Pro as a
     one-off purchase. Pro gives you <strong>unlimited 9-step reflections</strong>, <strong>unlimited AI summaries</strong>, 
-    the full printable Advanced Reflective Workbook, the full printable pack, and the expanded reflective practice workbook.
+    the full printable advanced reflective workbook — the full printable pack, and the expanded reflective practice workbook.
   </p>
 
   {/* Expandable full workbook details */}
