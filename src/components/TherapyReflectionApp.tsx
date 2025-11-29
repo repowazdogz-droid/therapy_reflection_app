@@ -521,6 +521,15 @@ export const TherapyReflectionApp: React.FC = () => {
                 </div>
               )}
               
+              {/* Pro unlocked message - shown for Pro users */}
+              {isPro && hasGenerated && (
+                <div style={{ marginTop: 12 }}>
+                  <p className="tra-ai-status" style={{ marginBottom: 8, color: "var(--tra-accent-strong)" }}>
+                    ✓ Pro unlocked · Unlimited 9-step reflections
+                  </p>
+                </div>
+              )}
+              
               {/* Admin badge - shows which model was used */}
               {isAdmin && reflectionModelUsed && hasGenerated && (
                 <div style={{
@@ -710,6 +719,15 @@ export const TherapyReflectionApp: React.FC = () => {
             </div>
           )}
           
+          {/* Pro unlocked message - shown for Pro users */}
+          {isPro && summaryStatus === "success" && (
+            <div style={{ marginTop: 12 }}>
+              <p className="tra-ai-status" style={{ marginBottom: 8, color: "var(--tra-accent-strong)" }}>
+                ✓ Pro unlocked · Unlimited AI summaries
+              </p>
+            </div>
+          )}
+          
           {/* Error message */}
           {summaryStatus === "error" && summaryError && (
             <p className="tra-ai-status tra-ai-status-error">{summaryError}</p>
@@ -860,8 +878,10 @@ export const TherapyReflectionApp: React.FC = () => {
   {isPro && (
     <div className="tra-actions" style={{ marginTop: 12 }}>
       <a
-        href="/bonuses/The%20Advanced%20Reflective%20Workbook-%20new%20new.pdf"
+        href="/bonuses/The Advanced Reflective Workbook- new new.pdf"
         download="The-Advanced-Reflective-Workbook.pdf"
+        target="_blank"
+        rel="noopener noreferrer"
         style={{ textDecoration: "none", display: "block" }}
       >
         <button
@@ -872,6 +892,9 @@ export const TherapyReflectionApp: React.FC = () => {
           Download workbook (PDF)
         </button>
       </a>
+      <p className="tra-premium-footnote" style={{ marginTop: 8, fontSize: "0.75rem", textAlign: "center" }}>
+        ✓ Pro unlocked · Your workbook is ready to download
+      </p>
     </div>
   )}
 
