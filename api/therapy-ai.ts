@@ -21,7 +21,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.7,
+      },
+    })
 
     if (mode === "reflection9") {
       const prompt = `Produce a 9-section structured reflective practice analysis from this text:
@@ -44,32 +50,27 @@ Return exactly this JSON format:
 }`
 
       try {
-        const result = await model.generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.7,
-          },
-        })
-
+        const result = await model.generateContent(prompt)
         const responseText = result.response.text()
+        
         let json: any
-
         try {
           json = JSON.parse(responseText)
         } catch (parseError) {
-          // Try to extract JSON from markdown code blocks
+          // Try to extract JSON from markdown code blocks if present
           const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || 
                           responseText.match(/(\{[\s\S]*\})/)
           if (jsonMatch) {
             json = JSON.parse(jsonMatch[1])
           } else {
-            throw new Error("Failed to parse JSON response")
+            console.error("Failed to parse JSON. Response:", responseText.substring(0, 500))
+            throw new Error("Failed to parse JSON response from Gemini")
           }
         }
 
         // Validate structure
         if (!json.reflection) {
+          console.error("Response missing 'reflection' field. Got:", JSON.stringify(json).substring(0, 500))
           throw new Error("Response missing 'reflection' field")
         }
 
@@ -91,31 +92,26 @@ Respond only with JSON:
 { "summary": "..." }`
 
       try {
-        const result = await model.generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.7,
-          },
-        })
-
+        const result = await model.generateContent(prompt)
         const responseText = result.response.text()
+        
         let json: any
-
         try {
           json = JSON.parse(responseText)
         } catch (parseError) {
-          // Try to extract JSON from markdown code blocks
+          // Try to extract JSON from markdown code blocks if present
           const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || 
                           responseText.match(/(\{[\s\S]*\})/)
           if (jsonMatch) {
             json = JSON.parse(jsonMatch[1])
           } else {
-            throw new Error("Failed to parse JSON response")
+            console.error("Failed to parse JSON. Response:", responseText.substring(0, 500))
+            throw new Error("Failed to parse JSON response from Gemini")
           }
         }
 
         if (!json.summary) {
+          console.error("Response missing 'summary' field. Got:", JSON.stringify(json).substring(0, 500))
           throw new Error("Response missing 'summary' field")
         }
 
