@@ -163,47 +163,79 @@ Return ONLY plain text. No JSON, no bullet syntax, no markdown headings.
   }
 }
 
+// Vercel Serverless Function Handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST")
-    return res.status(405).json({ error: "Method Not Allowed" })
-  }
-
+  // Wrap entire handler in try/catch for comprehensive error logging
   try {
+    // Method check
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST")
+      return res.status(405).json({ error: "Method Not Allowed" })
+    }
+
     // Check for GEMINI_API_KEY at handler level (Vercel serverless environment)
     const geminiApiKey = process.env.GEMINI_API_KEY
     if (!geminiApiKey) {
-      console.error("GEMINI_API_KEY is not set in environment variables")
+      const errorMsg = "GEMINI_API_KEY is not configured. Please add it in Vercel → Project → Settings → Environment Variables."
+      console.error("[therapy-ai] Missing GEMINI_API_KEY environment variable")
       return res.status(500).json({
-        error: "GEMINI_API_KEY is not configured. Please add it in Vercel → Project → Settings → Environment Variables."
+        error: errorMsg
       })
     }
 
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {}
+    // Parse request body
+    let body: any
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {}
+    } catch (parseError: any) {
+      console.error("[therapy-ai] Failed to parse request body:", parseError?.message)
+      return res.status(400).json({ error: "Invalid JSON in request body" })
+    }
+
     const { text, mode } = body as { text?: string; mode?: string }
 
+    // Validate input
     if (!text || typeof text !== "string" || !text.trim()) {
+      console.error("[therapy-ai] Missing or invalid 'text' field in request")
       return res.status(400).json({ error: "Missing text" })
     }
 
+    // Route to appropriate handler
     if (mode === "reflection9") {
+      console.log("[therapy-ai] Processing reflection9 request, text length:", text.length)
       const payload = await handleReflection(text, geminiApiKey)
       return res.status(200).json(payload)
     }
 
     if (mode === "summary") {
+      console.log("[therapy-ai] Processing summary request, text length:", text.length)
       const payload = await handleSummary(text, geminiApiKey)
       return res.status(200).json(payload)
     }
 
-    return res.status(400).json({ error: "Invalid mode" })
+    console.error("[therapy-ai] Invalid mode:", mode)
+    return res.status(400).json({ error: "Invalid mode. Use 'reflection9' or 'summary'" })
   } catch (err: any) {
-    console.error("therapy-ai handler error:", err)
+    // Comprehensive error logging for Vercel logs
+    console.error("[therapy-ai] Handler error:", {
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+      type: typeof err,
+      error: err
+    })
+    
     const message =
       err?.message ||
       "Something went wrong while talking to the AI. If this keeps happening, please contact support."
 
-    // IMPORTANT: still a 500, but always clean JSON so the frontend can show the message
-    return res.status(500).json({ error: message })
+    // Always return clean JSON error response
+    return res.status(500).json({ 
+      error: message,
+      // Include error type in development (helpful for debugging)
+      ...(process.env.NODE_ENV === "development" && { 
+        details: err?.stack?.split("\n")[0] 
+      })
+    })
   }
 }
