@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
+import { getDeviceId } from "../utils/deviceId"
+import { BuyProButton } from "./BuyProButton"
 
 type SectionKey =
   | "hypothesis"
@@ -375,6 +377,11 @@ export const TherapyReflectionApp: React.FC = () => {
   const [summaryText, setSummaryText] = useState("")
   const [summaryStatus, setSummaryStatus] = useState<SummaryStatus>("idle")
   const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    resetAt?: number;
+    hoursUntilReset?: number;
+    message?: string;
+  } | null>(null)
 
   const handleGenerateSummary = async () => {
     if (!combinedText || combinedText.trim().length === 0) {
@@ -383,16 +390,41 @@ export const TherapyReflectionApp: React.FC = () => {
       return
     }
 
-    if (!isPro && summaryUsedToday) {
-      setSummaryStatus("rate_limited")
-      setSummaryError("You've already used today's free summary on this device. You can ask again tomorrow.")
-      return
-    }
-
     setSummaryStatus("loading")
     setSummaryError(null)
+    setRateLimitInfo(null)
 
     try {
+      // Step 1: Check rate limit
+      const deviceId = getDeviceId()
+      const limitCheckRes = await fetch("/api/check-summary-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId,
+          isPro,
+          // stripeCustomerId: undefined, // TODO: Add if you track Stripe customers
+        }),
+      })
+
+      if (!limitCheckRes.ok) {
+        throw new Error("Failed to check rate limit")
+      }
+
+      const limitData = await limitCheckRes.json()
+
+      if (!limitData.allowed) {
+        setSummaryStatus("rate_limited")
+        setSummaryError(limitData.message || "You've used your free summary today. Upgrade to Pro for unlimited summaries.")
+        setRateLimitInfo({
+          resetAt: limitData.resetAt,
+          hoursUntilReset: limitData.hoursUntilReset,
+          message: limitData.message,
+        })
+        return
+      }
+
+      // Step 2: Generate summary if allowed
       const res = await fetch("/api/therapy-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -414,7 +446,8 @@ export const TherapyReflectionApp: React.FC = () => {
 
       setSummaryText(summary)
       setSummaryStatus("success")
-      if (!isPro) {
+      // Update local state for UI consistency
+      if (!limitData.pro) {
         markSummaryUsedNow()
       }
     } catch (err: any) {
@@ -437,8 +470,8 @@ export const TherapyReflectionApp: React.FC = () => {
   const summaryButtonLabel =
     summaryStatus === "loading"
       ? "Generating summary…"
-      : !isPro && summaryUsedToday
-      ? "Free summary used today"
+      : summaryStatus === "rate_limited"
+      ? "Daily limit reached"
       : isPro
       ? "Generate AI summary (Pro)"
       : "Generate AI summary"
@@ -629,17 +662,34 @@ export const TherapyReflectionApp: React.FC = () => {
             type="button"
             className="tra-button-primary tra-ai-button"
             onClick={handleGenerateSummary}
-            disabled={summaryStatus === "loading" || (!isPro && summaryUsedToday) || !hasGenerated}
+            disabled={summaryStatus === "loading" || summaryStatus === "rate_limited" || !hasGenerated}
           >
             {summaryButtonLabel}
           </button>
-          {!isPro && summaryStatus === "rate_limited" && (
-            <p className="tra-ai-status tra-ai-status-muted">
-              You&apos;ve used today&apos;s free summary. You can ask again tomorrow, or unlock Pro for more.
-            </p>
+          
+          {/* Rate limit message with upgrade CTA */}
+          {summaryStatus === "rate_limited" && (
+            <div style={{ marginTop: 12 }}>
+              <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 12 }}>
+                {summaryError || "You've used your free summary today. Upgrade to Pro for unlimited summaries."}
+                {rateLimitInfo?.hoursUntilReset && (
+                  <span style={{ display: "block", marginTop: 4, fontSize: "0.85em", opacity: 0.8 }}>
+                    Try again in {rateLimitInfo.hoursUntilReset} hour{rateLimitInfo.hoursUntilReset !== 1 ? "s" : ""}.
+                  </span>
+                )}
+              </p>
+              <BuyProButton />
+            </div>
           )}
+          
+          {/* Error message */}
           {summaryStatus === "error" && summaryError && (
             <p className="tra-ai-status tra-ai-status-error">{summaryError}</p>
+          )}
+          
+          {/* Loading state */}
+          {summaryStatus === "loading" && (
+            <p className="tra-ai-status tra-ai-status-muted">Generating your summary…</p>
           )}
           {summaryText && (
             <div className="tra-ai-summary-box">
