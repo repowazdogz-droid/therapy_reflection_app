@@ -19,6 +19,32 @@ const GROK_KEY = process.env.GROK_API_KEY
 // Admin check - set ADMIN_EMAIL in Vercel env vars to enable admin badge
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com"
 
+// Cost tracking (per 1M tokens or per request)
+// These are approximate costs - check current pricing on each provider's site
+const MODEL_COSTS = {
+  'gemini-2.5-flash': { input: 0.075, output: 0.30 }, // $0.075/$0.30 per 1M tokens
+  'gemini-2.0-flash-exp': { input: 0.075, output: 0.30 },
+  'gemini-1.5-flash': { input: 0.075, output: 0.30 },
+  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 }, // $3/$15 per 1M tokens
+  'gpt-4o-mini': { input: 0.15, output: 0.60 }, // $0.15/$0.60 per 1M tokens
+  'grok-beta': { input: 0.10, output: 0.30 }, // Approximate - check X.ai pricing
+}
+
+// Usage tracking (in-memory for now, can be moved to Redis/Upstash later)
+interface UsageStats {
+  totalRequests: number
+  modelUsage: Record<string, { count: number; totalCost: number; avgResponseTime: number }>
+  errors: Record<string, number>
+  lastUpdated: string
+}
+
+let usageStats: UsageStats = {
+  totalRequests: 0,
+  modelUsage: {},
+  errors: {},
+  lastUpdated: new Date().toISOString()
+}
+
 // Fallback templates (absolute last resort)
 const FALLBACK_REFLECTION = {
   hypothesis: "Use this space to write your own thoughts about what might be going on here.",
@@ -54,8 +80,56 @@ const MODELS: ModelConfig[] = [
 // Timeout for each model attempt (10 seconds)
 const MODEL_TIMEOUT = 10000
 
+// Logging helper
+function logUsage(modelName: string, success: boolean, responseTime: number, error?: string, tokens?: { input: number; output: number }) {
+  const timestamp = new Date().toISOString()
+  
+  // Update stats
+  usageStats.totalRequests++
+  usageStats.lastUpdated = timestamp
+  
+  if (success) {
+    if (!usageStats.modelUsage[modelName]) {
+      usageStats.modelUsage[modelName] = { count: 0, totalCost: 0, avgResponseTime: 0 }
+    }
+    usageStats.modelUsage[modelName].count++
+    
+    // Estimate cost (rough approximation - ~500 input tokens, ~1000 output tokens per request)
+    const estimatedInputTokens = tokens?.input || 500
+    const estimatedOutputTokens = tokens?.output || 1000
+    const cost = MODEL_COSTS[modelName as keyof typeof MODEL_COSTS]
+    if (cost) {
+      const inputCost = (estimatedInputTokens / 1_000_000) * cost.input
+      const outputCost = (estimatedOutputTokens / 1_000_000) * cost.output
+      usageStats.modelUsage[modelName].totalCost += inputCost + outputCost
+    }
+    
+    // Update average response time
+    const currentAvg = usageStats.modelUsage[modelName].avgResponseTime
+    const count = usageStats.modelUsage[modelName].count
+    usageStats.modelUsage[modelName].avgResponseTime = ((currentAvg * (count - 1)) + responseTime) / count
+    
+    console.log(`✅ [${timestamp}] ${modelName} succeeded in ${responseTime}ms`)
+  } else {
+    if (!usageStats.errors[modelName]) {
+      usageStats.errors[modelName] = 0
+    }
+    usageStats.errors[modelName]++
+    console.error(`❌ [${timestamp}] ${modelName} failed: ${error || 'Unknown error'}`)
+  }
+  
+  // Log summary every 10 requests
+  if (usageStats.totalRequests % 10 === 0) {
+    console.log(`📊 Usage Summary: ${usageStats.totalRequests} total requests`)
+    Object.entries(usageStats.modelUsage).forEach(([model, stats]) => {
+      console.log(`   ${model}: ${stats.count} uses, $${stats.totalCost.toFixed(4)} estimated cost, ${stats.avgResponseTime.toFixed(0)}ms avg`)
+    })
+  }
+}
+
 // Call Gemini API
 async function callGemini(model: string, systemInstruction: string, userPrompt: string, key: string): Promise<string> {
+  const startTime = Date.now()
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`
   
   const controller = new AbortController()
@@ -74,23 +148,38 @@ async function callGemini(model: string, systemInstruction: string, userPrompt: 
     })
     
     clearTimeout(timeoutId)
+    const responseTime = Date.now() - startTime
     
     if (!response.ok) {
       const errText = await response.text()
+      logUsage(model, false, responseTime, `HTTP ${response.status}: ${errText}`)
       throw new Error(`Gemini ${response.status}: ${errText}`)
     }
     
     const data = await response.json()
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
+    const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
+    
+    // Estimate tokens (rough: ~4 chars per token)
+    const inputTokens = Math.ceil((systemInstruction.length + userPrompt.length) / 4)
+    const outputTokens = Math.ceil(result.length / 4)
+    
+    logUsage(model, true, responseTime, undefined, { input: inputTokens, output: outputTokens })
+    return result
   } catch (e: any) {
     clearTimeout(timeoutId)
-    if (e.name === 'AbortError') throw new Error('Timeout')
+    const responseTime = Date.now() - startTime
+    if (e.name === 'AbortError') {
+      logUsage(model, false, responseTime, 'Timeout')
+      throw new Error('Timeout')
+    }
+    logUsage(model, false, responseTime, e?.message)
     throw e
   }
 }
 
 // Call Claude API
 async function callClaude(model: string, systemInstruction: string, userPrompt: string, key: string): Promise<string> {
+  const startTime = Date.now()
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), MODEL_TIMEOUT)
   
@@ -112,23 +201,38 @@ async function callClaude(model: string, systemInstruction: string, userPrompt: 
     })
     
     clearTimeout(timeoutId)
+    const responseTime = Date.now() - startTime
     
     if (!response.ok) {
       const errText = await response.text()
+      logUsage(model, false, responseTime, `HTTP ${response.status}: ${errText}`)
       throw new Error(`Claude ${response.status}: ${errText}`)
     }
     
     const data = await response.json()
-    return data.content?.[0]?.text || "{}"
+    const result = data.content?.[0]?.text || "{}"
+    
+    // Claude returns token counts in response
+    const inputTokens = data.usage?.input_tokens || Math.ceil((systemInstruction.length + userPrompt.length) / 4)
+    const outputTokens = data.usage?.output_tokens || Math.ceil(result.length / 4)
+    
+    logUsage(model, true, responseTime, undefined, { input: inputTokens, output: outputTokens })
+    return result
   } catch (e: any) {
     clearTimeout(timeoutId)
-    if (e.name === 'AbortError') throw new Error('Timeout')
+    const responseTime = Date.now() - startTime
+    if (e.name === 'AbortError') {
+      logUsage(model, false, responseTime, 'Timeout')
+      throw new Error('Timeout')
+    }
+    logUsage(model, false, responseTime, e?.message)
     throw e
   }
 }
 
 // Call OpenAI API
 async function callOpenAI(model: string, systemInstruction: string, userPrompt: string, key: string): Promise<string> {
+  const startTime = Date.now()
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), MODEL_TIMEOUT)
   
@@ -151,23 +255,38 @@ async function callOpenAI(model: string, systemInstruction: string, userPrompt: 
     })
     
     clearTimeout(timeoutId)
+    const responseTime = Date.now() - startTime
     
     if (!response.ok) {
       const errText = await response.text()
+      logUsage(model, false, responseTime, `HTTP ${response.status}: ${errText}`)
       throw new Error(`OpenAI ${response.status}: ${errText}`)
     }
     
     const data = await response.json()
-    return data.choices?.[0]?.message?.content || "{}"
+    const result = data.choices?.[0]?.message?.content || "{}"
+    
+    // OpenAI returns token counts
+    const inputTokens = data.usage?.prompt_tokens || Math.ceil((systemInstruction.length + userPrompt.length) / 4)
+    const outputTokens = data.usage?.completion_tokens || Math.ceil(result.length / 4)
+    
+    logUsage(model, true, responseTime, undefined, { input: inputTokens, output: outputTokens })
+    return result
   } catch (e: any) {
     clearTimeout(timeoutId)
-    if (e.name === 'AbortError') throw new Error('Timeout')
+    const responseTime = Date.now() - startTime
+    if (e.name === 'AbortError') {
+      logUsage(model, false, responseTime, 'Timeout')
+      throw new Error('Timeout')
+    }
+    logUsage(model, false, responseTime, e?.message)
     throw e
   }
 }
 
 // Call Grok API (X/Twitter)
 async function callGrok(model: string, systemInstruction: string, userPrompt: string, key: string): Promise<string> {
+  const startTime = Date.now()
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), MODEL_TIMEOUT)
   
@@ -191,17 +310,31 @@ async function callGrok(model: string, systemInstruction: string, userPrompt: st
     })
     
     clearTimeout(timeoutId)
+    const responseTime = Date.now() - startTime
     
     if (!response.ok) {
       const errText = await response.text()
+      logUsage(model, false, responseTime, `HTTP ${response.status}: ${errText}`)
       throw new Error(`Grok ${response.status}: ${errText}`)
     }
     
     const data = await response.json()
-    return data.choices?.[0]?.message?.content || "{}"
+    const result = data.choices?.[0]?.message?.content || "{}"
+    
+    // Estimate tokens (Grok may not return usage)
+    const inputTokens = data.usage?.prompt_tokens || Math.ceil((systemInstruction.length + userPrompt.length) / 4)
+    const outputTokens = data.usage?.completion_tokens || Math.ceil(result.length / 4)
+    
+    logUsage(model, true, responseTime, undefined, { input: inputTokens, output: outputTokens })
+    return result
   } catch (e: any) {
     clearTimeout(timeoutId)
-    if (e.name === 'AbortError') throw new Error('Timeout')
+    const responseTime = Date.now() - startTime
+    if (e.name === 'AbortError') {
+      logUsage(model, false, responseTime, 'Timeout')
+      throw new Error('Timeout')
+    }
+    logUsage(model, false, responseTime, e?.message)
     throw e
   }
 }
@@ -226,7 +359,7 @@ async function callAIWithFallback(
   // Try each model in order
   for (const modelConfig of MODELS) {
     try {
-      console.log(`🔄 Attempting ${modelConfig.name} (${modelConfig.provider})`)
+      console.log(`🔄 [${new Date().toISOString()}] Attempting ${modelConfig.name} (${modelConfig.provider})`)
       
       let rawResponse: string
       
@@ -257,7 +390,7 @@ async function callAIWithFallback(
         const hasAllKeys = requiredKeys.every(key => parsed[key] !== undefined)
         
         if (hasAllKeys) {
-          console.log(`✅ Success with ${modelConfig.name}`)
+          console.log(`✅ [${new Date().toISOString()}] Success with ${modelConfig.name}`)
           return { result: parsed, modelUsed: modelConfig.name }
         } else {
           throw new Error('Invalid reflection structure')
@@ -265,7 +398,7 @@ async function callAIWithFallback(
       } else {
         // Summary mode
         if (rawResponse && rawResponse.trim().length > 0) {
-          console.log(`✅ Success with ${modelConfig.name}`)
+          console.log(`✅ [${new Date().toISOString()}] Success with ${modelConfig.name}`)
           return { result: rawResponse.trim(), modelUsed: modelConfig.name }
         } else {
           throw new Error('Empty summary response')
@@ -274,7 +407,7 @@ async function callAIWithFallback(
       
     } catch (e: any) {
       const errorMsg = e?.message || String(e)
-      console.warn(`❌ ${modelConfig.name} failed: ${errorMsg}`)
+      console.warn(`❌ [${new Date().toISOString()}] ${modelConfig.name} failed: ${errorMsg}`)
       lastError = errorMsg
       // Continue to next model
       continue
@@ -282,7 +415,7 @@ async function callAIWithFallback(
   }
   
   // All models failed - use fallback template
-  console.warn("⚠️ All AI models failed. Using fallback template.")
+  console.warn(`⚠️ [${new Date().toISOString()}] All AI models failed. Using fallback template.`)
   return {
     result: mode === 'reflection9' ? FALLBACK_REFLECTION : FALLBACK_SUMMARY,
     modelUsed: 'fallback-template'
@@ -296,6 +429,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Admin stats endpoint
+  if (req.method === 'GET' && req.url?.includes('stats')) {
+    return res.status(200).json({
+      stats: usageStats,
+      modelsAvailable: MODELS.map(m => m.name),
+      modelsEnabled: MODELS.length,
+      timestamp: new Date().toISOString()
+    })
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" })
@@ -312,6 +455,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "No text provided" })
     }
 
+    console.log(`📝 [${new Date().toISOString()}] Processing ${mode} request (${text.length} chars)`)
+
     // Prepare prompts
     let systemInstruction = "You are a helpful summarizer. Provide a compassionate, structured summary in 2-3 paragraphs.";
     let userPrompt = `Summarize this reflection compassionately:\n\n${text}`;
@@ -324,10 +469,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Call AI with fallback chain
     const { result, modelUsed } = await callAIWithFallback(systemInstruction, userPrompt, mode)
 
-    // Check if request took >10 seconds (would benefit from queue)
-    // Note: Vercel Queue/Upstash Kafka would be implemented here for production
-    // For now, we handle it synchronously with timeouts
-
     // Build response
     const response: any = mode === "reflection9" 
       ? { reflection: result }
@@ -338,14 +479,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       response._admin = {
         modelUsed: modelUsed,
         modelsAvailable: MODELS.map(m => m.name),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        stats: usageStats.modelUsage[modelUsed] || null
       }
     }
 
     return res.status(200).json(response)
 
   } catch (err: any) {
-    console.error("🔥 FINAL CRASH:", err)
+    console.error(`🔥 [${new Date().toISOString()}] FINAL CRASH:`, err)
     
     // Last resort fallback
     const mode = (req.body as any)?.mode === "reflection9" ? "reflection9" : "summary"
