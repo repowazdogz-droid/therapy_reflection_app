@@ -1,15 +1,18 @@
 // scripts/local-test.ts
 
 import dotenv from 'dotenv';
-import handler from '../api/therapy-ai'; // Adjust path if needed
+import handler from '../api/therapy-ai'; // Importing the API handler
 
-// Load environment variables from .env
+// Load environment variables
 dotenv.config();
 
-console.log("🛠️  Testing API Logic Locally...");
-console.log("🔑 Checking Key:", process.env.GEMINI_API_KEY ? "Found" : "MISSING");
+console.log("\n🛠️  STARTING LOCAL TEST...");
 
-// Mock the Vercel Request
+// 1. Check API Key
+const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+console.log("🔑 API Key Status:", apiKey ? "✅ Found" : "❌ MISSING (Check .env file)");
+
+// 2. Mock Request
 const req = {
   method: 'POST',
   body: {
@@ -18,27 +21,32 @@ const req = {
   }
 };
 
-// Mock the Vercel Response
+// 3. Mock Response
 const res = {
-  setHeader: (key: string, value: string) => console.log(`[Header] ${key}: ${value}`),
+  setHeader: () => {},
   status: (code: number) => {
-    console.log(`\n[Status]: ${code}`);
+    console.log(`\nHTTP Status: ${code}`);
     return {
       json: (data: any) => {
-        console.log("\n[Response Data]:");
+        console.log("📦 Response Data:");
         console.dir(data, { depth: null, colors: true });
+        
+        if (data.error) {
+            console.log("\n❌ TEST FAILED: API returned an error.");
+        } else {
+            console.log("\n✅ TEST PASSED: Logic is working!");
+        }
       },
-      end: () => console.log("[End]")
+      end: () => {}
     };
   }
 };
 
-// Run the handler
+// 4. Run Handler
 (async () => {
   try {
     await handler(req as any, res as any);
   } catch (error) {
-    console.error("CRITICAL CRASH:", error);
+    console.error("\n❌ CRITICAL CRASH:", error);
   }
 })();
-
