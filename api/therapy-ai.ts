@@ -60,8 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`Processing ${mode} for text length: ${text.length}`);
 
     // 5. The "Raw Fetch" to Google (No SDKs required)
-    const model = "gemini-1.5-flash"; // Stable model
+    // Use gemini-2.5-flash (fast and available) or fallback to gemini-flash-latest
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"; // Fast and available model
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+    console.log(`Using model: ${model}`);
 
     // Construct the prompt based on mode
     let systemPrompt = "";
