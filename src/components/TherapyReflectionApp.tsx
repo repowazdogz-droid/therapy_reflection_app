@@ -130,6 +130,10 @@ type SummaryStatus = "idle" | "loading" | "success" | "error" | "rate_limited"
 const SUMMARY_STORAGE_KEY = "tra_summary_last_used_v1"
 const REFLECTION_STORAGE_KEY = "tra_reflection_state_v1"
 const PRO_UNLOCK_KEY = "tra_pro_unlocked_v1"
+// Client-side rate limiting for 9-step reflection generation
+// NOTE: This is intentionally client-side only. Free users can clear localStorage to bypass,
+// but this is acceptable for now as a soft limit. Pro users bypass this check entirely.
+const REFLECTION_LIMIT_KEY = "9step-reflection-last-date"
 
 type SaveStatus = "idle" | "saved"
 
@@ -171,6 +175,9 @@ export const TherapyReflectionApp: React.FC = () => {
   const [isPro, setIsPro] = useState(false)
   const [summaryUsedToday, setSummaryUsedToday] = useState(false)
   const [showWorkbookDetails, setShowWorkbookDetails] = useState(false)
+  
+  // Client-side rate limiting for 9-step reflection (1 per day for free users)
+  const [reflectionUsedToday, setReflectionUsedToday] = useState(false)
 
 
   useEffect(() => {
@@ -200,6 +207,25 @@ export const TherapyReflectionApp: React.FC = () => {
       }
     } catch {
       // ignore
+    }
+  }, [])
+
+  // Check if 9-step reflection was used today (client-side rate limiting)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const lastDateStr = localStorage.getItem(REFLECTION_LIMIT_KEY)
+      if (lastDateStr) {
+        const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
+        if (lastDateStr === today) {
+          setReflectionUsedToday(true)
+        } else {
+          // Different day, clear old date
+          setReflectionUsedToday(false)
+        }
+      }
+    } catch {
+      // ignore localStorage errors
     }
   }, [])
 
@@ -295,6 +321,18 @@ export const TherapyReflectionApp: React.FC = () => {
       setReflectionError("Write a brief description of the situation before generating your 9-step reflection.")
       return
     }
+
+    // Save today's date to localStorage when generation starts (client-side rate limiting)
+    if (typeof window !== "undefined" && !isPro) {
+      try {
+        const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
+        localStorage.setItem(REFLECTION_LIMIT_KEY, today)
+        setReflectionUsedToday(true)
+      } catch {
+        // ignore localStorage errors
+      }
+    }
+
     setReflectionError(null)
     setIsGeneratingReflection(true)
 
@@ -511,11 +549,55 @@ export const TherapyReflectionApp: React.FC = () => {
                   type="button"
                   className="tra-button-primary"
                   onClick={handleGenerateReflection}
-                  disabled={isGeneratingReflection || !startText.trim()}
+                  disabled={
+                    isGeneratingReflection ||
+                    !startText.trim() ||
+                    (!isPro && reflectionUsedToday)
+                  }
+                  style={{
+                    opacity: !isPro && reflectionUsedToday ? 0.5 : undefined,
+                    cursor: !isPro && reflectionUsedToday ? "not-allowed" : undefined,
+                  }}
                 >
-                  {isGeneratingReflection ? "Generating 9-step reflection…" : "Generate 9-step reflection"}
+                  {isGeneratingReflection
+                    ? "Generating 9-step reflection…"
+                    : !isPro && reflectionUsedToday
+                    ? "Daily limit reached"
+                    : "Generate 9-step reflection"}
                 </button>
               </div>
+              
+              {/* Rate limit message and upgrade CTA */}
+              {!isPro && reflectionUsedToday && (
+                <div style={{ marginTop: 12 }}>
+                  <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
+                    You&apos;ve used your free 9-step reflection today. Upgrade to Pro for unlimited →
+                  </p>
+                  <BuyProButton />
+                </div>
+              )}
+              
+              {/* Dev-only reset button */}
+              {process.env.NODE_ENV === "development" && (
+                <button
+                  type="button"
+                  className="tra-button-secondary"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      localStorage.removeItem(REFLECTION_LIMIT_KEY)
+                      setReflectionUsedToday(false)
+                    }
+                  }}
+                  style={{
+                    marginTop: 8,
+                    fontSize: "0.75rem",
+                    padding: "4px 8px",
+                    opacity: 0.7,
+                  }}
+                >
+                  Reset daily limit (dev only)
+                </button>
+              )}
               {!hasGenerated && !isGeneratingReflection && (
                 <p className="tra-start-note">
                   Your AI-generated 9-step reflection will appear below once you click "Generate".
