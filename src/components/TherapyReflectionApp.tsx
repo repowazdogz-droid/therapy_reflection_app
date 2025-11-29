@@ -271,9 +271,6 @@ export const TherapyReflectionApp: React.FC = () => {
       return
     }
 
-    // Mark as used (saves today's date to localStorage)
-    reflectionLimit.useItNow()
-
     setReflectionError(null)
     setIsGeneratingReflection(true)
 
@@ -327,6 +324,11 @@ export const TherapyReflectionApp: React.FC = () => {
       setReflection((prev) => ({ ...prev, ...(next as ReflectionState) }))
       setHasGenerated(true)
       setReflectionError(null)
+      
+      // Mark as used AFTER successful generation (for free users only)
+      if (!isPro) {
+        reflectionLimit.useItNow()
+      }
     } catch (err: any) {
       console.error("Generate 9-step reflection error", err)
       let errorMessage = err?.message || "Something went wrong asking the AI to generate your 9-step reflection."
@@ -364,9 +366,6 @@ export const TherapyReflectionApp: React.FC = () => {
       return
     }
 
-    // Mark as used (saves today's date to localStorage)
-    summaryLimit.useItNow()
-
     setSummaryStatus("loading")
     setSummaryError(null)
 
@@ -392,6 +391,11 @@ export const TherapyReflectionApp: React.FC = () => {
 
       setSummaryText(summary)
       setSummaryStatus("success")
+      
+      // Mark as used AFTER successful generation (for free users only)
+      if (!isPro) {
+        summaryLimit.useItNow()
+      }
     } catch (err: any) {
       console.error("AI summary error", err)
       setSummaryStatus("error")
@@ -412,8 +416,6 @@ export const TherapyReflectionApp: React.FC = () => {
   const summaryButtonLabel =
     summaryStatus === "loading"
       ? "Generating summary…"
-      : !summaryLimit.isAllowed
-      ? "Daily limit reached"
       : isPro
       ? "Generate AI summary (Pro)"
       : "Generate AI summary"
@@ -453,26 +455,14 @@ export const TherapyReflectionApp: React.FC = () => {
                   type="button"
                   className="tra-button-primary"
                   onClick={handleGenerateReflection}
-                  disabled={
-                    isGeneratingReflection ||
-                    !startText.trim() ||
-                    !reflectionLimit.isAllowed
-                  }
-                  style={{
-                    opacity: !reflectionLimit.isAllowed ? 0.5 : undefined,
-                    cursor: !reflectionLimit.isAllowed ? "not-allowed" : undefined,
-                  }}
+                  disabled={isGeneratingReflection || !startText.trim()}
                 >
-                  {isGeneratingReflection
-                    ? "Generating 9-step reflection…"
-                    : !reflectionLimit.isAllowed
-                    ? "Daily limit reached"
-                    : "Generate 9-step reflection"}
+                  {isGeneratingReflection ? "Generating 9-step reflection…" : "Generate 9-step reflection"}
                 </button>
               </div>
               
-              {/* Rate limit message and upgrade CTA */}
-              {!reflectionLimit.isAllowed && (
+              {/* Rate limit message and upgrade CTA - shown AFTER successful generation */}
+              {reflectionLimit.wasUsedToday && hasGenerated && (
                 <div style={{ marginTop: 12 }}>
                   <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                     You&apos;ve used your free 9-step reflection today. Upgrade to Pro for unlimited →
@@ -626,17 +616,13 @@ export const TherapyReflectionApp: React.FC = () => {
             type="button"
             className="tra-button-primary tra-ai-button"
             onClick={handleGenerateSummary}
-            disabled={summaryStatus === "loading" || !summaryLimit.isAllowed || !hasGenerated}
-            style={{
-              opacity: !summaryLimit.isAllowed ? 0.5 : undefined,
-              cursor: !summaryLimit.isAllowed ? "not-allowed" : undefined,
-            }}
+            disabled={summaryStatus === "loading" || !hasGenerated}
           >
             {summaryButtonLabel}
           </button>
           
-          {/* Rate limit message with upgrade CTA */}
-          {!summaryLimit.isAllowed && (
+          {/* Rate limit message with upgrade CTA - shown AFTER successful generation */}
+          {summaryLimit.wasUsedToday && summaryStatus === "success" && (
             <div style={{ marginTop: 12 }}>
               <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                 You&apos;ve used your free AI summary today. Upgrade to Pro for unlimited →

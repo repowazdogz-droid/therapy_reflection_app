@@ -15,19 +15,20 @@ export function useDailyLimit(
   isPro: boolean
 ): {
   isAllowed: boolean;
+  wasUsedToday: boolean; // For showing message after generation
   useItNow: () => void;
   resetForTesting: () => void;
 } {
   const storageKey = `daily-limit:${feature}`;
-  const [isAllowed, setIsAllowed] = useState(true);
+  const [wasUsedToday, setWasUsedToday] = useState(false);
 
-  // Check limit on mount and when Pro status changes
+  // Check if already used today on mount and when Pro status changes
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Pro users bypass limit
+    // Pro users never show "used today" message
     if (isPro) {
-      setIsAllowed(true);
+      setWasUsedToday(false);
       return;
     }
 
@@ -35,13 +36,13 @@ export function useDailyLimit(
       const lastDateStr = localStorage.getItem(storageKey);
       if (lastDateStr) {
         const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-        setIsAllowed(lastDateStr !== today);
+        setWasUsedToday(lastDateStr === today);
       } else {
-        setIsAllowed(true);
+        setWasUsedToday(false);
       }
     } catch {
-      // ignore localStorage errors, allow by default
-      setIsAllowed(true);
+      // ignore localStorage errors
+      setWasUsedToday(false);
     }
   }, [storageKey, isPro]);
 
@@ -51,7 +52,7 @@ export function useDailyLimit(
     try {
       const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
       localStorage.setItem(storageKey, today);
-      setIsAllowed(false);
+      setWasUsedToday(true);
     } catch {
       // ignore localStorage errors
     }
@@ -62,14 +63,15 @@ export function useDailyLimit(
 
     try {
       localStorage.removeItem(storageKey);
-      setIsAllowed(true);
+      setWasUsedToday(false);
     } catch {
       // ignore localStorage errors
     }
   };
 
   return {
-    isAllowed: isPro || isAllowed, // Pro users always allowed
+    isAllowed: true, // Always allow first click - limit is enforced after generation
+    wasUsedToday: !isPro && wasUsedToday, // Only show message for free users who used it today
     useItNow,
     resetForTesting,
   };
