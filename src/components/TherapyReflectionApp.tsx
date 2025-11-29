@@ -139,6 +139,8 @@ export const TherapyReflectionApp: React.FC = () => {
   const [hasGenerated, setHasGenerated] = useState(false)
   const [isGeneratingReflection, setIsGeneratingReflection] = useState(false)
   const [reflectionError, setReflectionError] = useState<string | null>(null)
+  const [reflectionModelUsed, setReflectionModelUsed] = useState<string | null>(null)
+  const [summaryModelUsed, setSummaryModelUsed] = useState<string | null>(null)
 
   // Reflection state
   const [reflection, setReflection] = useState<ReflectionState>(() => {
@@ -298,7 +300,11 @@ export const TherapyReflectionApp: React.FC = () => {
         throw new Error(errorMsg)
       }
 
-      const data = (await res.json()) as { reflection?: Partial<Record<SectionKey, string>>; error?: string }
+      const data = (await res.json()) as { 
+        reflection?: Partial<Record<SectionKey, string>>; 
+        error?: string;
+        _admin?: { modelUsed: string; modelsAvailable: string[]; timestamp: string };
+      }
 
       if (data.error) {
         throw new Error(data.error)
@@ -324,6 +330,11 @@ export const TherapyReflectionApp: React.FC = () => {
       setReflection((prev) => ({ ...prev, ...(next as ReflectionState) }))
       setHasGenerated(true)
       setReflectionError(null)
+      
+      // Store model used (for admin badge)
+      if (data._admin?.modelUsed) {
+        setReflectionModelUsed(data._admin.modelUsed)
+      }
       
       // Mark as used AFTER successful generation (for free users only)
       if (!isPro) {
@@ -382,7 +393,10 @@ export const TherapyReflectionApp: React.FC = () => {
         throw new Error(errorMsg)
       }
 
-      const data = await res.json()
+      const data = await res.json() as {
+        summary?: string;
+        _admin?: { modelUsed: string; modelsAvailable: string[]; timestamp: string };
+      }
       const summary = data.summary
 
       if (!summary || typeof summary !== "string") {
@@ -391,6 +405,11 @@ export const TherapyReflectionApp: React.FC = () => {
 
       setSummaryText(summary)
       setSummaryStatus("success")
+      
+      // Store model used (for admin badge)
+      if (data._admin?.modelUsed) {
+        setSummaryModelUsed(data._admin.modelUsed)
+      }
       
       // Mark as used AFTER successful generation (for free users only)
       if (!isPro) {
@@ -415,10 +434,16 @@ export const TherapyReflectionApp: React.FC = () => {
 
   const summaryButtonLabel =
     summaryStatus === "loading"
-      ? "Generating summary…"
+      ? "Taking a moment…"
       : isPro
       ? "Generate AI summary (Pro)"
       : "Generate AI summary"
+  
+  // Admin check - simple check for admin mode (set ADMIN_MODE=true in localStorage for testing)
+  const isAdmin = typeof window !== "undefined" && (
+    localStorage.getItem("ADMIN_MODE") === "true" || 
+    window.location.search.includes("admin=true")
+  )
 
   // UI
   return (
@@ -457,7 +482,7 @@ export const TherapyReflectionApp: React.FC = () => {
                   onClick={handleGenerateReflection}
                   disabled={isGeneratingReflection || !startText.trim()}
                 >
-                  {isGeneratingReflection ? "Generating 9-step reflection…" : "Generate 9-step reflection"}
+                  {isGeneratingReflection ? "Taking a moment…" : "Generate 9-step reflection"}
                 </button>
               </div>
               
@@ -470,6 +495,22 @@ export const TherapyReflectionApp: React.FC = () => {
                   <BuyProButton />
                 </div>
               )}
+              
+              {/* Admin badge - shows which model was used */}
+              {isAdmin && reflectionModelUsed && hasGenerated && (
+                <div style={{
+                  marginTop: 8,
+                  padding: "4px 8px",
+                  background: "#f0f0f0",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "0.7rem",
+                  color: "#666",
+                  fontFamily: "monospace"
+                }}>
+                  🤖 Model: {reflectionModelUsed}
+                </div>
+              )}
               {!hasGenerated && !isGeneratingReflection && (
                 <p className="tra-start-note">
                   Your AI-generated 9-step reflection will appear below once you click "Generate".
@@ -477,7 +518,7 @@ export const TherapyReflectionApp: React.FC = () => {
               )}
               {isGeneratingReflection && (
                 <p className="tra-start-note">
-                  AI is creating your 9-step reflection. This may take a few moments…
+                  Taking a moment… Trying multiple AI models to ensure the best response.
                 </p>
               )}
               {reflectionError && <p className="tra-ai-status tra-ai-status-error">{reflectionError}</p>}
@@ -638,7 +679,23 @@ export const TherapyReflectionApp: React.FC = () => {
           
           {/* Loading state */}
           {summaryStatus === "loading" && (
-            <p className="tra-ai-status tra-ai-status-muted">Generating your summary…</p>
+            <p className="tra-ai-status tra-ai-status-muted">Taking a moment… Trying multiple AI models to ensure the best response.</p>
+          )}
+          
+          {/* Admin badge - shows which model was used */}
+          {isAdmin && summaryModelUsed && (
+            <div style={{
+              marginTop: 8,
+              padding: "4px 8px",
+              background: "#f0f0f0",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              fontSize: "0.7rem",
+              color: "#666",
+              fontFamily: "monospace"
+            }}>
+              🤖 Model: {summaryModelUsed}
+            </div>
           )}
           {summaryText && (
             <div className="tra-ai-summary-box">
