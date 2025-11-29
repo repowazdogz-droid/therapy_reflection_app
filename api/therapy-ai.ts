@@ -17,19 +17,11 @@ import type { VercelRequest, VercelResponse } from "@vercel/node"
  *  - Set GEMINI_API_KEY in Vercel → Project → Settings → Environment Variables
  */
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-
 // Minimal REST call to Gemini, no extra npm packages needed
-async function callGemini(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error(
-      "GEMINI_API_KEY is not set. Add it in your Vercel project environment variables."
-    )
-  }
-
+async function callGemini(prompt: string, apiKey: string): Promise<string> {
   const url =
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=" +
-    encodeURIComponent(GEMINI_API_KEY)
+    encodeURIComponent(apiKey)
 
   const res = await fetch(url, {
     method: "POST",
@@ -74,7 +66,7 @@ function extractJson(text: string): string {
   return text.trim()
 }
 
-async function handleReflection(text: string) {
+async function handleReflection(text: string, apiKey: string) {
   const prompt = `
 You are a gentle, trauma-informed reflective practice assistant for therapists and support workers.
 
@@ -107,7 +99,7 @@ Guidelines:
 - Always fill every field, even if you have to be tentative.
 `
 
-  const raw = await callGemini(prompt)
+  const raw = await callGemini(prompt, apiKey)
   const jsonString = extractJson(raw)
 
   let parsed: any
@@ -143,7 +135,7 @@ Guidelines:
   return { reflection }
 }
 
-async function handleSummary(text: string) {
+async function handleSummary(text: string, apiKey: string) {
   const prompt = `
 You are a gentle reflective practice summariser.
 
@@ -165,7 +157,7 @@ Task:
 Return ONLY plain text. No JSON, no bullet syntax, no markdown headings.
 `
 
-  const summary = await callGemini(prompt)
+  const summary = await callGemini(prompt, apiKey)
   return {
     summary: summary.trim(),
   }
@@ -178,6 +170,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Check for GEMINI_API_KEY at handler level (Vercel serverless environment)
+    const geminiApiKey = process.env.GEMINI_API_KEY
+    if (!geminiApiKey) {
+      console.error("GEMINI_API_KEY is not set in environment variables")
+      return res.status(500).json({
+        error: "GEMINI_API_KEY is not configured. Please add it in Vercel → Project → Settings → Environment Variables."
+      })
+    }
+
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {}
     const { text, mode } = body as { text?: string; mode?: string }
 
@@ -186,12 +187,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (mode === "reflection9") {
-      const payload = await handleReflection(text)
+      const payload = await handleReflection(text, geminiApiKey)
       return res.status(200).json(payload)
     }
 
     if (mode === "summary") {
-      const payload = await handleSummary(text)
+      const payload = await handleSummary(text, geminiApiKey)
       return res.status(200).json(payload)
     }
 
