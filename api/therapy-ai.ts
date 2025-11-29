@@ -15,6 +15,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node"
  *
  * IMPORTANT:
  *  - Set GEMINI_API_KEY in Vercel → Project → Settings → Environment Variables
+ *  - Uses process.env.GEMINI_API_KEY (NOT import.meta.env - that's for client-side only)
  */
 
 // Minimal REST call to Gemini, no extra npm packages needed
@@ -163,9 +164,9 @@ Return ONLY plain text. No JSON, no bullet syntax, no markdown headings.
   }
 }
 
-// Vercel Serverless Function Handler
+// Vercel Serverless Function Handler - Standard format
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Wrap entire handler in try/catch for comprehensive error logging
+  // Wrap ENTIRE logic in try/catch for comprehensive error handling
   try {
     // Method check
     if (req.method !== "POST") {
@@ -173,7 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(405).json({ error: "Method Not Allowed" })
     }
 
-    // Check for GEMINI_API_KEY at handler level (Vercel serverless environment)
+    // Check for GEMINI_API_KEY using process.env (NOT import.meta.env - that's client-side only)
     const geminiApiKey = process.env.GEMINI_API_KEY
     if (!geminiApiKey) {
       const errorMsg = "GEMINI_API_KEY is not configured. Please add it in Vercel → Project → Settings → Environment Variables."
@@ -215,27 +216,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.error("[therapy-ai] Invalid mode:", mode)
     return res.status(400).json({ error: "Invalid mode. Use 'reflection9' or 'summary'" })
-  } catch (err: any) {
-    // Comprehensive error logging for Vercel logs
+  } catch (error: any) {
+    // Comprehensive error logging and response
     console.error("[therapy-ai] Handler error:", {
-      message: err?.message,
-      stack: err?.stack,
-      name: err?.name,
-      type: typeof err,
-      error: err
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+      type: typeof error,
+      error: error
     })
     
-    const message =
-      err?.message ||
-      "Something went wrong while talking to the AI. If this keeps happening, please contact support."
-
-    // Always return clean JSON error response
+    // Explicit error response with stack trace for debugging
     return res.status(500).json({ 
-      error: message,
-      // Include error type in development (helpful for debugging)
-      ...(process.env.NODE_ENV === "development" && { 
-        details: err?.stack?.split("\n")[0] 
-      })
+      error: error?.message || "Internal server error",
+      stack: error?.stack
     })
   }
 }
