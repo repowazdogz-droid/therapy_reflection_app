@@ -10,7 +10,8 @@
     "dev:vercel": "vercel dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test:api": "tsx scripts/local-test.ts"
+    "test:api": "tsx scripts/local-test.ts",
+    "debug:api": "tsx api/debug.ts"
   },
   "dependencies": {
     "@vercel/node": "^3.0.0",
