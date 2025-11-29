@@ -383,6 +383,38 @@ export const TherapyReflectionApp: React.FC = () => {
   const [summaryStatus, setSummaryStatus] = useState<SummaryStatus>("idle")
   const [summaryError, setSummaryError] = useState<string | null>(null)
 
+  // Clean up summary text - remove JSON artifacts, markdown, etc.
+  const cleanSummaryText = (text: string): string => {
+    if (!text || typeof text !== "string") return ""
+    
+    let cleaned = text.trim()
+    
+    // Remove JSON wrapper patterns like "summary": "..."
+    cleaned = cleaned.replace(/^["']?summary["']?\s*:\s*["']?/i, "")
+    cleaned = cleaned.replace(/["']?\s*[,}]?\s*$/i, "")
+    
+    // Remove markdown code blocks
+    cleaned = cleaned.replace(/```json\s*/gi, "")
+    cleaned = cleaned.replace(/```\s*/g, "")
+    
+    // Remove JSON object wrappers
+    cleaned = cleaned.replace(/^\s*{\s*["']?summary["']?\s*:\s*["']?/i, "")
+    cleaned = cleaned.replace(/["']?\s*}\s*$/i, "")
+    
+    // Remove extra quotes at start/end
+    cleaned = cleaned.replace(/^["']+|["']+$/g, "")
+    
+    // Clean up escaped quotes
+    cleaned = cleaned.replace(/\\"/g, '"')
+    cleaned = cleaned.replace(/\\n/g, "\n")
+    
+    // Remove extra whitespace but preserve paragraph breaks
+    cleaned = cleaned.replace(/\n{3,}/g, "\n\n")
+    cleaned = cleaned.trim()
+    
+    return cleaned
+  }
+
   const handleGenerateSummary = async () => {
     if (!combinedText || combinedText.trim().length === 0) {
       setSummaryError("Write at least a few lines in any of the 9 sections before asking for an AI summary.")
@@ -410,13 +442,20 @@ export const TherapyReflectionApp: React.FC = () => {
         summary?: string;
         _admin?: { modelUsed: string; modelsAvailable: string[]; timestamp: string };
       }
-      const summary = data.summary
+      const rawSummary = data.summary
 
-      if (!summary || typeof summary !== "string") {
+      if (!rawSummary || typeof rawSummary !== "string") {
         throw new Error("No summary received from AI.")
       }
 
-      setSummaryText(summary)
+      // Clean the summary text before displaying
+      const cleanedSummary = cleanSummaryText(rawSummary)
+      
+      if (!cleanedSummary || cleanedSummary.trim().length === 0) {
+        throw new Error("Summary was empty after cleaning.")
+      }
+
+      setSummaryText(cleanedSummary)
       setSummaryStatus("success")
       
       // Store model used (for admin badge)
