@@ -1,10 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: "2023-10-16",
-});
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { session_id } = req.query;
   
@@ -13,6 +9,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Check for STRIPE_SECRET_KEY before initializing Stripe
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      console.error("STRIPE_SECRET_KEY is not set in environment variables");
+      return res.status(500).json({ 
+        ok: false,
+        error: "STRIPE_SECRET_KEY is not configured. Please add it in Vercel → Project → Settings → Environment Variables."
+      });
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: "2023-10-16",
+    });
+
     const session = await stripe.checkout.sessions.retrieve(session_id);
     const paid = session.payment_status === "paid" || session.status === "complete";
     
@@ -21,8 +31,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(200).json({ ok: true, status: session.payment_status });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ ok: false, error: "Verification failed" });
+  } catch (error: any) {
+    console.error("Error verifying session:", error);
+    return res.status(500).json({ 
+      ok: false, 
+      error: error?.message || "Verification failed. Check your Stripe configuration."
+    });
   }
 }

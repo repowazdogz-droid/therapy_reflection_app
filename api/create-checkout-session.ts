@@ -1,10 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: "2023-10-16",
-});
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -12,6 +8,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Check for STRIPE_SECRET_KEY before initializing Stripe
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+      console.error("STRIPE_SECRET_KEY is not set in environment variables");
+      return res.status(500).json({ 
+        error: "STRIPE_SECRET_KEY is not configured. Please add it in Vercel → Project → Settings → Environment Variables."
+      });
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: "2023-10-16",
+    });
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -32,8 +41,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     return res.status(200).json({ id: session.id, url: session.url });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating checkout session:", error);
-    return res.status(500).json({ error: "Unable to create checkout session" });
+    return res.status(500).json({ 
+      error: error?.message || "Unable to create checkout session. Check your Stripe configuration."
+    });
   }
 }
