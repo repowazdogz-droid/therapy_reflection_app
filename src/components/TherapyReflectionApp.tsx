@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { getDeviceId } from "../utils/deviceId"
 import { BuyProButton } from "./BuyProButton"
+import { useDailyLimit } from "../hooks/useDailyLimit"
 
 type SectionKey =
   | "hypothesis"
@@ -130,10 +130,6 @@ type SummaryStatus = "idle" | "loading" | "success" | "error" | "rate_limited"
 const SUMMARY_STORAGE_KEY = "tra_summary_last_used_v1"
 const REFLECTION_STORAGE_KEY = "tra_reflection_state_v1"
 const PRO_UNLOCK_KEY = "tra_pro_unlocked_v1"
-// Client-side rate limiting for 9-step reflection generation
-// NOTE: This is intentionally client-side only. Free users can clear localStorage to bypass,
-// but this is acceptable for now as a soft limit. Pro users bypass this check entirely.
-const REFLECTION_LIMIT_KEY = "9step-reflection-last-date"
 
 type SaveStatus = "idle" | "saved"
 
@@ -171,32 +167,10 @@ export const TherapyReflectionApp: React.FC = () => {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  // Free vs Pro (for summaries)
+  // Free vs Pro
   const [isPro, setIsPro] = useState(false)
-  const [summaryUsedToday, setSummaryUsedToday] = useState(false)
   const [showWorkbookDetails, setShowWorkbookDetails] = useState(false)
-  
-  // Client-side rate limiting for 9-step reflection (1 per day for free users)
-  const [reflectionUsedToday, setReflectionUsedToday] = useState(false)
 
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const raw = window.localStorage.getItem(SUMMARY_STORAGE_KEY)
-      if (raw) {
-        const last = new Date(raw)
-        const now = new Date()
-        const sameDay =
-          last.getFullYear() === now.getFullYear() &&
-          last.getMonth() === now.getMonth() &&
-          last.getDate() === now.getDate()
-        setSummaryUsedToday(sameDay)
-      }
-    } catch {
-      // ignore
-    }
-  }, [])
   // Load Pro unlock state (from previous purchase on this device)
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -210,24 +184,9 @@ export const TherapyReflectionApp: React.FC = () => {
     }
   }, [])
 
-  // Check if 9-step reflection was used today (client-side rate limiting)
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const lastDateStr = localStorage.getItem(REFLECTION_LIMIT_KEY)
-      if (lastDateStr) {
-        const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
-        if (lastDateStr === today) {
-          setReflectionUsedToday(true)
-        } else {
-          // Different day, clear old date
-          setReflectionUsedToday(false)
-        }
-      }
-    } catch {
-      // ignore localStorage errors
-    }
-  }, [])
+  // Daily rate limiting hooks (client-side, zero cost)
+  const reflectionLimit = useDailyLimit("reflection", isPro)
+  const summaryLimit = useDailyLimit("summary", isPro)
 
 
   // Load saved reflection on mount
@@ -258,16 +217,6 @@ export const TherapyReflectionApp: React.FC = () => {
     }
   }, [reflection])
 
-  const markSummaryUsedNow = () => {
-    if (typeof window === "undefined") return
-    const nowIso = new Date().toISOString()
-    try {
-      window.localStorage.setItem(SUMMARY_STORAGE_KEY, nowIso)
-    } catch {
-      // ignore
-    }
-    setSummaryUsedToday(true)
-  }
   // Unlock Pro manually (local override for users who already bought)
   const handleUnlockProLocal = () => {
     setIsPro(true)
@@ -322,16 +271,8 @@ export const TherapyReflectionApp: React.FC = () => {
       return
     }
 
-    // Save today's date to localStorage when generation starts (client-side rate limiting)
-    if (typeof window !== "undefined" && !isPro) {
-      try {
-        const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
-        localStorage.setItem(REFLECTION_LIMIT_KEY, today)
-        setReflectionUsedToday(true)
-      } catch {
-        // ignore localStorage errors
-      }
-    }
+    // Mark as used (saves today's date to localStorage)
+    reflectionLimit.useItNow()
 
     setReflectionError(null)
     setIsGeneratingReflection(true)
@@ -415,11 +356,6 @@ export const TherapyReflectionApp: React.FC = () => {
   const [summaryText, setSummaryText] = useState("")
   const [summaryStatus, setSummaryStatus] = useState<SummaryStatus>("idle")
   const [summaryError, setSummaryError] = useState<string | null>(null)
-  const [rateLimitInfo, setRateLimitInfo] = useState<{
-    resetAt?: number;
-    hoursUntilReset?: number;
-    message?: string;
-  } | null>(null)
 
   const handleGenerateSummary = async () => {
     if (!combinedText || combinedText.trim().length === 0) {
@@ -428,41 +364,13 @@ export const TherapyReflectionApp: React.FC = () => {
       return
     }
 
+    // Mark as used (saves today's date to localStorage)
+    summaryLimit.useItNow()
+
     setSummaryStatus("loading")
     setSummaryError(null)
-    setRateLimitInfo(null)
 
     try {
-      // Step 1: Check rate limit
-      const deviceId = getDeviceId()
-      const limitCheckRes = await fetch("/api/check-summary-limit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId,
-          isPro,
-          // stripeCustomerId: undefined, // TODO: Add if you track Stripe customers
-        }),
-      })
-
-      if (!limitCheckRes.ok) {
-        throw new Error("Failed to check rate limit")
-      }
-
-      const limitData = await limitCheckRes.json()
-
-      if (!limitData.allowed) {
-        setSummaryStatus("rate_limited")
-        setSummaryError(limitData.message || "You've used your free summary today. Upgrade to Pro for unlimited summaries.")
-        setRateLimitInfo({
-          resetAt: limitData.resetAt,
-          hoursUntilReset: limitData.hoursUntilReset,
-          message: limitData.message,
-        })
-        return
-      }
-
-      // Step 2: Generate summary if allowed
       const res = await fetch("/api/therapy-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -484,10 +392,6 @@ export const TherapyReflectionApp: React.FC = () => {
 
       setSummaryText(summary)
       setSummaryStatus("success")
-      // Update local state for UI consistency
-      if (!limitData.pro) {
-        markSummaryUsedNow()
-      }
     } catch (err: any) {
       console.error("AI summary error", err)
       setSummaryStatus("error")
@@ -508,7 +412,7 @@ export const TherapyReflectionApp: React.FC = () => {
   const summaryButtonLabel =
     summaryStatus === "loading"
       ? "Generating summary…"
-      : summaryStatus === "rate_limited"
+      : !summaryLimit.isAllowed
       ? "Daily limit reached"
       : isPro
       ? "Generate AI summary (Pro)"
@@ -552,51 +456,29 @@ export const TherapyReflectionApp: React.FC = () => {
                   disabled={
                     isGeneratingReflection ||
                     !startText.trim() ||
-                    (!isPro && reflectionUsedToday)
+                    !reflectionLimit.isAllowed
                   }
                   style={{
-                    opacity: !isPro && reflectionUsedToday ? 0.5 : undefined,
-                    cursor: !isPro && reflectionUsedToday ? "not-allowed" : undefined,
+                    opacity: !reflectionLimit.isAllowed ? 0.5 : undefined,
+                    cursor: !reflectionLimit.isAllowed ? "not-allowed" : undefined,
                   }}
                 >
                   {isGeneratingReflection
                     ? "Generating 9-step reflection…"
-                    : !isPro && reflectionUsedToday
+                    : !reflectionLimit.isAllowed
                     ? "Daily limit reached"
                     : "Generate 9-step reflection"}
                 </button>
               </div>
               
               {/* Rate limit message and upgrade CTA */}
-              {!isPro && reflectionUsedToday && (
+              {!reflectionLimit.isAllowed && (
                 <div style={{ marginTop: 12 }}>
                   <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                     You&apos;ve used your free 9-step reflection today. Upgrade to Pro for unlimited →
                   </p>
                   <BuyProButton />
                 </div>
-              )}
-              
-              {/* Dev-only reset button */}
-              {process.env.NODE_ENV === "development" && (
-                <button
-                  type="button"
-                  className="tra-button-secondary"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      localStorage.removeItem(REFLECTION_LIMIT_KEY)
-                      setReflectionUsedToday(false)
-                    }
-                  }}
-                  style={{
-                    marginTop: 8,
-                    fontSize: "0.75rem",
-                    padding: "4px 8px",
-                    opacity: 0.7,
-                  }}
-                >
-                  Reset daily limit (dev only)
-                </button>
               )}
               {!hasGenerated && !isGeneratingReflection && (
                 <p className="tra-start-note">
@@ -744,21 +626,20 @@ export const TherapyReflectionApp: React.FC = () => {
             type="button"
             className="tra-button-primary tra-ai-button"
             onClick={handleGenerateSummary}
-            disabled={summaryStatus === "loading" || summaryStatus === "rate_limited" || !hasGenerated}
+            disabled={summaryStatus === "loading" || !summaryLimit.isAllowed || !hasGenerated}
+            style={{
+              opacity: !summaryLimit.isAllowed ? 0.5 : undefined,
+              cursor: !summaryLimit.isAllowed ? "not-allowed" : undefined,
+            }}
           >
             {summaryButtonLabel}
           </button>
           
           {/* Rate limit message with upgrade CTA */}
-          {summaryStatus === "rate_limited" && (
+          {!summaryLimit.isAllowed && (
             <div style={{ marginTop: 12 }}>
-              <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 12 }}>
-                {summaryError || "You've used your free summary today. Upgrade to Pro for unlimited summaries."}
-                {rateLimitInfo?.hoursUntilReset && (
-                  <span style={{ display: "block", marginTop: 4, fontSize: "0.85em", opacity: 0.8 }}>
-                    Try again in {rateLimitInfo.hoursUntilReset} hour{rateLimitInfo.hoursUntilReset !== 1 ? "s" : ""}.
-                  </span>
-                )}
+              <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
+                You&apos;ve used your free AI summary today. Upgrade to Pro for unlimited →
               </p>
               <BuyProButton />
             </div>
@@ -876,6 +757,27 @@ export const TherapyReflectionApp: React.FC = () => {
     additional AI support, and the full printable workbook pack.
   </p>
 </div>
+
+        {/* Dev-only: Reset all daily limits */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="tra-side-card" style={{ marginTop: 12, opacity: 0.7 }}>
+            <button
+              type="button"
+              className="tra-button-secondary"
+              onClick={() => {
+                reflectionLimit.resetForTesting()
+                summaryLimit.resetForTesting()
+              }}
+              style={{
+                fontSize: "0.75rem",
+                padding: "4px 8px",
+                width: "100%",
+              }}
+            >
+              Reset all daily limits (dev only)
+            </button>
+          </div>
+        )}
 </aside>
 </div>
 )
