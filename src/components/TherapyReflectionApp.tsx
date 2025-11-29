@@ -659,9 +659,26 @@ export const TherapyReflectionApp: React.FC = () => {
           )}
         </div>
 
-{/* Reflection Pro – single £14.99 Stripe offer (FINAL CORRECTED VERSION) */}
+{/* Reflection Pro – Lifetime Pro £99 offer */}
 <div className="tra-side-card tra-premium-card">
-  <h2 className="tra-section-title">Unlock Reflection Pro · £14.99</h2>
+  {/* Price increase banner */}
+  <div style={{
+    background: "#dc2626",
+    color: "white",
+    padding: "8px 12px",
+    borderRadius: "8px",
+    marginBottom: 12,
+    textAlign: "center",
+    fontSize: "0.85rem",
+    fontWeight: 600,
+  }}>
+    ⚠️ Price increasing to £169 soon
+  </div>
+
+  <h2 className="tra-section-title">Unlock Lifetime Pro Access</h2>
+  <p className="tra-section-body" style={{ marginBottom: 8 }}>
+    <strong>Lifetime access · £99 one-time</strong> <span style={{ textDecoration: "line-through", color: "var(--tra-text-muted)" }}>(normally £239)</span>
+  </p>
   <p className="tra-section-body">
     If this space is helpful and you&apos;d like deeper support, you can unlock Therapy Reflection Pro as a
     one-off purchase. Pro gives you the full printable pack and the expanded reflective practice workbook.
@@ -725,15 +742,7 @@ export const TherapyReflectionApp: React.FC = () => {
 
   {/* Stripe Checkout */}
   <div className="tra-actions" style={{ marginTop: 12 }}>
-    <a
-      href="https://YOUR_STRIPE_CHECKOUT_LINK_HERE"
-      target="_blank"
-      rel="noreferrer"
-    >
-      <button type="button" className="tra-button-primary">
-        Get Reflection Pro – £14.99
-      </button>
-    </a>
+    <BuyProButton />
   </div>
 
   {/* Removed: Local unlock for returning customers */}

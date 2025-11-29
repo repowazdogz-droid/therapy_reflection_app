@@ -48,7 +48,7 @@ export const BuyProButton: React.FC<BuyProButtonProps> = ({ onSuccess, className
         disabled={loading}
         style={{ width: "100%" }}
       >
-        {loading ? "Redirecting to checkout…" : "Upgrade to Pro – £14.99"}
+        {loading ? "Redirecting to checkout…" : "Upgrade to Pro – £99"}
       </button>
       {error && (
         <p className="tra-ai-status tra-ai-status-error" style={{ marginTop: 8 }}>

@@ -28,15 +28,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         {
           price_data: {
             currency: "gbp",
-            unit_amount: 1499,
+            unit_amount: 9900, // £99.00
             product_data: {
-              name: "Advanced Reflective Workbook + Unlimited Summaries",
+              name: "Lifetime Pro Access - Advanced Reflective Workbook + Unlimited Summaries",
             },
           },
           quantity: 1,
         },
       ],
-      success_url: `${req.headers.origin}/#/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${req.headers.origin}/#/pro-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.origin}/#/cancelled`,
     });
 
