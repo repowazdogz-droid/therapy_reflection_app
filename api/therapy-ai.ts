@@ -64,10 +64,13 @@ async function callGemini(prompt: string): Promise<string> {
   return text
 }
 
-// Strip json ...  wrappers if present
+// Strip ```json ... ``` wrappers if present
 function extractJson(text: string): string {
   const match = text.match(/```json\s*([\s\S]*?)```/i)
   if (match) return match[1].trim()
+  // Also try without json tag
+  const match2 = text.match(/```\s*([\s\S]*?)```/)
+  if (match2) return match2[1].trim()
   return text.trim()
 }
 
