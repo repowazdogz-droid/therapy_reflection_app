@@ -663,7 +663,7 @@ export const TherapyReflectionApp: React.FC = () => {
 <div className="tra-side-card tra-premium-card">
   {/* Price increase banner */}
   <div style={{
-    background: "#dc2626",
+    background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
     color: "white",
     padding: "8px 12px",
     borderRadius: "8px",
@@ -671,6 +671,7 @@ export const TherapyReflectionApp: React.FC = () => {
     textAlign: "center",
     fontSize: "0.85rem",
     fontWeight: 600,
+    boxShadow: "0 2px 8px rgba(217, 119, 6, 0.2)",
   }}>
     ⚠️ Price increasing to £169 soon
   </div>
