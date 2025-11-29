@@ -10,9 +10,107 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
 }
 
 #root {
   min-height: 100vh;
 }
 
+/* Purple theme styles */
+.tra-shell {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.tra-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.tra-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tra-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #4c1d95;
+  margin-bottom: 0.5rem;
+}
+
+.tra-section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #4c1d95;
+  margin-bottom: 1rem;
+}
+
+.tra-section-body {
+  color: #6b7280;
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.tra-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tra-button-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);
+}
+
+.tra-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.5);
+}
+
+.tra-button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.tra-summary-block {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.tra-summary-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #4c1d95;
+  margin-bottom: 1rem;
+}
+
+.tra-summary-text {
+  color: #374151;
+  line-height: 1.7;
+  white-space: pre-line;
+}

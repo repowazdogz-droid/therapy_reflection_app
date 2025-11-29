@@ -12,39 +12,41 @@ function MainLayout() {
   const isPro = useOmegaPro();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* Top bar / upsell */}
-      <header className="w-full border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">
-              Therapy Reflection
-            </h1>
-            <p className="text-xs text-slate-500">
-              Guided reflection + gentle AI summaries.
-            </p>
-          </div>
-          <div className="flex flex-col items-start sm:items-end gap-1">
-            <BuyAccessButton />
-            {!isPro && (
-              <p className="text-[11px] text-slate-500">
-                3 free summaries remaining. Unlock unlimited + The Advanced
-                Reflective Workbook PDF.
+    <div className="tra-shell">
+      <div className="tra-container">
+        {/* Top bar / upsell */}
+        <header className="tra-header">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="tra-title">
+                THERAPY REFLECTION SPACE
+              </h1>
+              <p className="tra-section-body text-sm">
+                A gentle, therapist-designed reflection tool for support workers, carers, and overwhelmed adults.
               </p>
-            )}
-            {isPro && (
-              <p className="text-[11px] text-emerald-600 font-medium">
-                Unlimited summaries unlocked on this device.
-              </p>
-            )}
+            </div>
+            <div className="flex flex-col items-start sm:items-end gap-2">
+              <BuyAccessButton />
+              {!isPro && (
+                <p className="text-xs text-gray-600">
+                  3 free summaries remaining. Unlock unlimited + The Advanced
+                  Reflective Workbook PDF.
+                </p>
+              )}
+              {isPro && (
+                <p className="text-xs text-emerald-600 font-medium">
+                  ✓ Unlimited summaries unlocked on this device.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main app body */}
-      <main className="mx-auto max-w-3xl px-4 py-6">
-        <TherapyReflectionApp />
-      </main>
+        {/* Main app body */}
+        <main>
+          <TherapyReflectionApp />
+        </main>
+      </div>
     </div>
   );
 }

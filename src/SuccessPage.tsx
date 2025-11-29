@@ -10,24 +10,30 @@ export default function SuccessPage() {
   }, [])
 
   return (
-    <div className="p-6 max-w-md mx-auto text-center">
-      <h1 className="text-2xl font-bold mb-4">Thank you for your purchase! 🎉</h1>
-      {verified && (
-        <>
-          <p className="mb-4">Your PDF is ready to download:</p>
-          <a
-            href="/products/TheAdvancedReflectiveWorkbook.pdf"
-            download
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md"
-          >
-            Download PDF
-          </a>
-          <p className="mt-6 text-sm text-gray-600">
-            Unlimited summaries are unlocked on this device.
-          </p>
-        </>
-      )}
+    <div className="tra-shell">
+      <div className="tra-container">
+        <div className="tra-card" style={{ maxWidth: "600px", margin: "0 auto", textAlign: "center" }}>
+          <h1 className="tra-section-title" style={{ marginBottom: "1rem" }}>
+            Thank you for your purchase! 🎉
+          </h1>
+          {verified && (
+            <>
+              <p className="tra-section-body mb-4">Your PDF is ready to download:</p>
+              <a
+                href="/products/TheAdvancedReflectiveWorkbook.pdf"
+                download
+                className="tra-button-primary inline-block"
+                style={{ textDecoration: "none" }}
+              >
+                Download PDF
+              </a>
+              <p className="tra-section-body mt-6 text-sm">
+                Unlimited summaries are unlocked on this device.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
-

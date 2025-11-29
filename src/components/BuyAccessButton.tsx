@@ -44,7 +44,7 @@ export default function BuyAccessButton() {
       <button
         onClick={handleBuy}
         disabled={loading}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md font-medium disabled:opacity-60 transition"
+        className="tra-button-primary w-full"
       >
         {loading ? "Redirecting…" : "Unlock PDF + Unlimited Summaries – £14.99"}
       </button>
