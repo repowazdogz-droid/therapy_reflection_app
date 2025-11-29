@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { BuyProButton } from "./BuyProButton"
 import { useDailyLimit } from "../hooks/useDailyLimit"
 
 type SectionKey =
@@ -173,13 +172,26 @@ export const TherapyReflectionApp: React.FC = () => {
   const [isPro, setIsPro] = useState(false)
   const [showWorkbookDetails, setShowWorkbookDetails] = useState(false)
 
-  // Load Pro unlock state (from previous purchase on this device)
+  // Load Pro unlock state (from previous purchase on this device + URL param from Stripe redirect)
   useEffect(() => {
     if (typeof window === "undefined") return
+    
     try {
+      // Check localStorage first
       const unlocked = window.localStorage.getItem(PRO_UNLOCK_KEY)
       if (unlocked === "true") {
         setIsPro(true)
+      }
+      
+      // Check URL parameter from Stripe redirect (?pro=1)
+      const params = new URLSearchParams(window.location.search)
+      if (params.get("pro") === "1") {
+        setIsPro(true)
+        window.localStorage.setItem(PRO_UNLOCK_KEY, "true")
+        
+        // Clean URL - remove ?pro=1 from address bar
+        const newUrl = window.location.pathname + window.location.hash
+        window.history.replaceState({}, "", newUrl)
       }
     } catch {
       // ignore
@@ -486,13 +498,26 @@ export const TherapyReflectionApp: React.FC = () => {
                 </button>
               </div>
               
-              {/* Rate limit message and upgrade CTA - shown AFTER successful generation */}
-              {reflectionLimit.wasUsedToday && hasGenerated && (
+              {/* Rate limit message and upgrade CTA - shown AFTER successful generation (only for free users) */}
+              {!isPro && reflectionLimit.wasUsedToday && hasGenerated && (
                 <div style={{ marginTop: 12 }}>
                   <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                     You&apos;ve used your free 9-step reflection today. Upgrade to Pro for unlimited →
                   </p>
-                  <BuyProButton />
+                  <a
+                    href="YOUR_STRIPE_PAYMENT_LINK_URL"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: "none", display: "block" }}
+                  >
+                    <button
+                      type="button"
+                      className="tra-button-primary"
+                      style={{ width: "100%" }}
+                    >
+                      Upgrade to Pro – £99
+                    </button>
+                  </a>
                 </div>
               )}
               
@@ -657,18 +682,31 @@ export const TherapyReflectionApp: React.FC = () => {
             type="button"
             className="tra-button-primary tra-ai-button"
             onClick={handleGenerateSummary}
-            disabled={summaryStatus === "loading" || !hasGenerated}
+            disabled={summaryStatus === "loading" || !hasGenerated || (!isPro && !summaryLimit.isAllowed)}
           >
             {summaryButtonLabel}
           </button>
           
-          {/* Rate limit message with upgrade CTA - shown AFTER successful generation */}
-          {summaryLimit.wasUsedToday && summaryStatus === "success" && (
+          {/* Rate limit message with upgrade CTA - shown AFTER successful generation (only for free users) */}
+          {!isPro && summaryLimit.wasUsedToday && summaryStatus === "success" && (
             <div style={{ marginTop: 12 }}>
               <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                 You&apos;ve used your free AI summary today. Upgrade to Pro for unlimited →
               </p>
-              <BuyProButton />
+              <a
+                href="YOUR_STRIPE_PAYMENT_LINK_URL"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "none", display: "block" }}
+              >
+                <button
+                  type="button"
+                  className="tra-button-primary"
+                  style={{ width: "100%" }}
+                >
+                  Upgrade to Pro – £99
+                </button>
+              </a>
             </div>
           )}
           
@@ -798,12 +836,44 @@ export const TherapyReflectionApp: React.FC = () => {
     </div>
   )}
 
-  {/* Stripe Checkout */}
-  <div className="tra-actions" style={{ marginTop: 12 }}>
-    <BuyProButton />
-  </div>
+  {/* Stripe Payment Link - Replace YOUR_STRIPE_PAYMENT_LINK_URL with your actual Stripe Payment Link */}
+  {!isPro && (
+    <div className="tra-actions" style={{ marginTop: 12 }}>
+      <a
+        href="YOUR_STRIPE_PAYMENT_LINK_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: "none", display: "block" }}
+      >
+        <button
+          type="button"
+          className="tra-button-primary"
+          style={{ width: "100%" }}
+        >
+          Upgrade to Pro – £99
+        </button>
+      </a>
+    </div>
+  )}
 
-  {/* Removed: Local unlock for returning customers */}
+  {/* PDF Download Button - Only visible for Pro users */}
+  {isPro && (
+    <div className="tra-actions" style={{ marginTop: 12 }}>
+      <a
+        href="/bonuses/The Advanced Reflective Workbook- new new.pdf"
+        download="The-Advanced-Reflective-Workbook.pdf"
+        style={{ textDecoration: "none", display: "block" }}
+      >
+        <button
+          type="button"
+          className="tra-button-secondary"
+          style={{ width: "100%" }}
+        >
+          Download workbook (PDF)
+        </button>
+      </a>
+    </div>
+  )}
 
   <p className="tra-premium-footnote">
     The app will always remain free. Pro is an optional layer for when you want deeper structure,
