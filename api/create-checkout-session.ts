@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           quantity: 1,
         },
       ],
-      success_url: `${req.headers.origin}/#/pro-success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${req.headers.origin}/?pro=1`,
       cancel_url: `${req.headers.origin}/#/cancelled`,
     });
 
