@@ -2,11 +2,16 @@ import React from "react";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { TherapyReflectionApp } from "./components/TherapyReflectionApp";
 import { ProSuccessPage } from "./pages/ProSuccessPage";
+import { StripeConfirmationPage } from "./pages/StripeConfirmationPage";
 
 export const App: React.FC = () => {
   return (
     <HashRouter>
       <Routes>
+        <Route
+          path="/stripe-success"
+          element={<StripeConfirmationPage />}
+        />
         <Route
           path="/pro-success"
           element={<ProSuccessPage />}
