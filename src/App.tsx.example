@@ -1,0 +1,20 @@
+import { HashRouter, Routes, Route } from "react-router-dom"
+import SuccessPage from "./SuccessPage"
+import CancelledPage from "./CancelledPage"
+// Import your other components:
+// import Home from "./Home"
+// import TherapyReflectionApp from "./components/TherapyReflectionApp"
+
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/reflect" element={<TherapyReflectionApp />} />
+        <Route path="/success" element={<SuccessPage />} />
+        <Route path="/cancelled" element={<CancelledPage />} />
+      </Routes>
+    </HashRouter>
+  )
+}
+
