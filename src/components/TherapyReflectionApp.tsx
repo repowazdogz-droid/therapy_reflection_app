@@ -878,10 +878,8 @@ export const TherapyReflectionApp: React.FC = () => {
   {isPro && (
     <div className="tra-actions" style={{ marginTop: 12 }}>
       <a
-        href="/bonuses/The Advanced Reflective Workbook- new new.pdf"
+        href="/bonuses/The%20Advanced%20Reflective%20Workbook-%20new%20new.pdf"
         download="The-Advanced-Reflective-Workbook.pdf"
-        target="_blank"
-        rel="noopener noreferrer"
         style={{ textDecoration: "none", display: "block" }}
       >
         <button
