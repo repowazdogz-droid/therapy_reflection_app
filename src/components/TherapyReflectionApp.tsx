@@ -552,7 +552,7 @@ export const TherapyReflectionApp: React.FC = () => {
             <div className="tra-intro-tag">
               <span className="tra-intro-tag-label">{isPro ? "Pro unlocked" : "Free + optional Pro"}</span>
               <span className="tra-intro-tag-note">
-                9-step model · {isPro ? "unlimited AI summaries" : "1 AI summary / day on free tier"}
+                9-step model · {isPro ? "unlimited AI summaries" : "1 AI summary/day"}
               </span>
             </div>
           </div>
@@ -860,7 +860,7 @@ export const TherapyReflectionApp: React.FC = () => {
   {isPro && (
     <div className="tra-actions" style={{ marginTop: 12 }}>
       <a
-        href="/bonuses/The Advanced Reflective Workbook- new new.pdf"
+        href="/bonuses/The%20Advanced%20Reflective%20Workbook-%20new%20new.pdf"
         download="The-Advanced-Reflective-Workbook.pdf"
         style={{ textDecoration: "none", display: "block" }}
       >
