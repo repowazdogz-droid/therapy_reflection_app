@@ -777,8 +777,17 @@ export const TherapyReflectionApp: React.FC = () => {
                 Here&apos;s a short, structured snapshot of what you&apos;ve written. Read it slowly and
                 notice what feels accurate — and what doesn&apos;t.
               </p>
-              <p className="tra-ai-summary-text">{summaryText}</p>
-              <p className="tra-ai-status tra-ai-status-muted">
+              <div 
+                className="tra-ai-summary-text" 
+                style={{ 
+                  whiteSpace: "pre-wrap",
+                  wordWrap: "break-word",
+                  lineHeight: "1.6"
+                }}
+              >
+                {summaryText}
+              </div>
+              <p className="tra-ai-status tra-ai-status-muted" style={{ marginTop: 12 }}>
                 This is a helper, not a diagnosis. If anything feels off, trust your own sense of the
                 situation over the summary.
               </p>
