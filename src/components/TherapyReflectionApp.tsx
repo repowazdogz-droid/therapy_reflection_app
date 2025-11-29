@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useDailyLimit } from "../hooks/useDailyLimit"
+import { BuyProButton } from "./BuyProButton"
 
 type SectionKey =
   | "hypothesis"
@@ -504,20 +505,7 @@ export const TherapyReflectionApp: React.FC = () => {
                   <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                     You&apos;ve used your free 9-step reflection today. Upgrade to Pro for unlimited →
                   </p>
-                  <a
-                    href="YOUR_STRIPE_PAYMENT_LINK_URL"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ textDecoration: "none", display: "block" }}
-                  >
-                    <button
-                      type="button"
-                      className="tra-button-primary"
-                      style={{ width: "100%" }}
-                    >
-                      Upgrade to Pro – £99
-                    </button>
-                  </a>
+                  <BuyProButton />
                 </div>
               )}
               
@@ -702,20 +690,7 @@ export const TherapyReflectionApp: React.FC = () => {
               <p className="tra-ai-status tra-ai-status-error" style={{ marginBottom: 8 }}>
                 You&apos;ve used your free AI summary today. Upgrade to Pro for unlimited →
               </p>
-              <a
-                href="YOUR_STRIPE_PAYMENT_LINK_URL"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: "none", display: "block" }}
-              >
-                <button
-                  type="button"
-                  className="tra-button-primary"
-                  style={{ width: "100%" }}
-                >
-                  Upgrade to Pro – £99
-                </button>
-              </a>
+              <BuyProButton />
             </div>
           )}
           
@@ -854,23 +829,10 @@ export const TherapyReflectionApp: React.FC = () => {
     </div>
   )}
 
-  {/* Stripe Payment Link - Replace YOUR_STRIPE_PAYMENT_LINK_URL with your actual Stripe Payment Link */}
+  {/* Stripe Checkout API - Uses BuyProButton component */}
   {!isPro && (
     <div className="tra-actions" style={{ marginTop: 12 }}>
-      <a
-        href="YOUR_STRIPE_PAYMENT_LINK_URL"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ textDecoration: "none", display: "block" }}
-      >
-        <button
-          type="button"
-          className="tra-button-primary"
-          style={{ width: "100%" }}
-        >
-          Upgrade to Pro – £99
-        </button>
-      </a>
+      <BuyProButton />
     </div>
   )}
 
