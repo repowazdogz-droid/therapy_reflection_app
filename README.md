@@ -40,6 +40,30 @@ For Vercel deployment, add these in Project Settings > Environment Variables.
 npm run build
 ```
 
+## Local API Testing
+
+Test your API routes locally without deploying to Vercel:
+
+```bash
+npm run test:api
+```
+
+This will:
+- Load environment variables from `.env`
+- Mock the Vercel request/response objects
+- Run the API handler directly
+- Display the output in your terminal
+
+**Setup:**
+1. Create a `.env` file in the root directory
+2. Add your `GEMINI_API_KEY`:
+   ```
+   GEMINI_API_KEY=your_api_key_here
+   ```
+3. Run `npm run test:api`
+
+The test script uses a sample reflection text. Edit `scripts/local-test.ts` to customize the test input.
+
 ## Deploy to Vercel
 
 1. Connect your GitHub repo to Vercel
