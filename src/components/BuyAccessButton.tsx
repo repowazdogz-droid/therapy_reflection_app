@@ -40,17 +40,18 @@ export default function BuyAccessButton() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div>
       <button
         onClick={handleBuy}
         disabled={loading}
-        className="tra-button-primary w-full"
+        className="tra-button-primary"
+        style={{ width: "100%" }}
       >
-        {loading ? "Redirecting…" : "Unlock PDF + Unlimited Summaries – £14.99"}
+        {loading ? "REDIRECTING…" : "GET REFLECTION PRO - £14.99"}
       </button>
 
       {error && (
-        <p className="text-sm text-red-500 text-center">
+        <p className="tra-ai-status tra-ai-status-error" style={{ marginTop: "6px" }}>
           {error}
         </p>
       )}

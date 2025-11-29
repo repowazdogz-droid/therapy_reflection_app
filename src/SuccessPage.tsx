@@ -11,9 +11,9 @@ export default function SuccessPage() {
 
   return (
     <div className="tra-shell">
-      <div className="tra-container">
-        <div className="tra-card" style={{ maxWidth: "600px", margin: "0 auto", textAlign: "center" }}>
-          <h1 className="tra-section-title" style={{ marginBottom: "1rem" }}>
+      <div className="tra-main">
+        <div className="tra-section-card" style={{ maxWidth: "600px", margin: "0 auto", textAlign: "center" }}>
+          <h1 className="tra-section-title" style={{ marginBottom: "1rem", fontSize: "1.2rem" }}>
             Thank you for your purchase! 🎉
           </h1>
           {verified && (
@@ -22,10 +22,10 @@ export default function SuccessPage() {
               <a
                 href="/products/TheAdvancedReflectiveWorkbook.pdf"
                 download
-                className="tra-button-primary inline-block"
-                style={{ textDecoration: "none" }}
+                className="tra-button-primary"
+                style={{ textDecoration: "none", display: "inline-block" }}
               >
-                Download PDF
+                DOWNLOAD PDF
               </a>
               <p className="tra-section-body mt-6 text-sm">
                 Unlimited summaries are unlocked on this device.
