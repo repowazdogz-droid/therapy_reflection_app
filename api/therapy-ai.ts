@@ -1,128 +1,96 @@
-// api/therapy-ai.ts
-
-// -------------------------------------------------------
-// ZERO-DEPENDENCY MODE
-// This file uses NO external libraries to prevent Vercel 500 startup crashes.
-// It uses standard fetch() and process.env.
-// -------------------------------------------------------
-
 import type { VercelRequest, VercelResponse } from "@vercel/node"
 
-export const maxDuration = 60; // Allow 60 seconds for AI
+const GEMINI_KEY =
+  process.env.GEMINI_API_KEY ||
+  process.env.GOOGLE_API_KEY ||
+  process.env.NEXT_PUBLIC_GEMINI_API_KEY
+
+// MIRRORING YOUR WORKING APP CONFIGURATION
+// We prioritize the models you mentioned: 2.5 and 2.0
+const FALLBACK_MODELS = [
+  "gemini-2.5-flash",      // Priority 1
+  "gemini-2.0-flash-exp",  // Priority 2
+  "gemini-1.5-flash"       // Safety Fallback
+]
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // 1. Setup CORS manually (fixes generic network errors)
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // 1. CORS Setup (Essential for Vercel)
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight OPTIONS check
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" })
   }
 
-  // 2. Debugging: Log that the function actually started
-  console.log("API Function Started. Method:", req.method);
-
-  // 3. Environment Variable Check
-  // We check ALL possible names to be safe
-  const API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-
-  if (!API_KEY) {
-    console.error("CRITICAL: API Key is missing.");
-    return res.status(500).json({ 
-      error: "Configuration Error: GEMINI_API_KEY is missing in Vercel Settings." 
-    });
+  if (!GEMINI_KEY) {
+    console.error("❌ CRITICAL: GEMINI_API_KEY is missing in Vercel settings.");
+    return res.status(500).json({ error: "Server Configuration Error: API Key Missing" })
   }
 
   try {
-    // 4. Safe Body Parsing
-    // Sometimes Vercel parses it, sometimes it's a string. We handle both.
-    let body = req.body;
-    if (typeof body === 'string') {
+    const rawBody = req.body
+    const body = typeof rawBody === "string" ? JSON.parse(rawBody) : (rawBody as any) || {}
+    const text = body.text || body.reflection || ""
+    const mode = body?.mode === "reflection9" ? "reflection9" : "summary"
+
+    console.log(`Processing ${mode} with models: ${FALLBACK_MODELS.join(", ")}`);
+
+    // --- LOGIC FROM WORKING APP ---
+    let systemInstruction = "You are a helpful summarizer.";
+    let userPrompt = `Summarize this: ${text}`;
+
+    if (mode === "reflection9") {
+      systemInstruction = "You are a calm therapist creating a 9-part reflection. Reply ONLY with a JSON object with these keys: hypothesis, theme, approaches, theoreticalBase, reasoning, safeguarding, workerReflection, selfCare, claritySnapshot. No markdown."
+      userPrompt = `Generate reflection for: ${text}`
+    }
+
+    // Try models in order
+    let lastError = ""
+    for (const model of FALLBACK_MODELS) {
       try {
-        body = JSON.parse(body);
-      } catch (e) {
-        console.error("JSON Parse Error:", e);
-        return res.status(400).json({ error: "Invalid JSON body" });
-      }
-    }
-    
-    const text = body?.text || body?.reflection || "";
-    const mode = body?.mode || "summary";
+        console.log(`Attempting model: ${model}`);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`
+        
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            contents: [{ parts: [{ text: userPrompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          }),
+        })
 
-    if (!text) {
-      return res.status(400).json({ error: "No text provided in request body." });
-    }
-
-    console.log(`Processing ${mode} for text length: ${text.length}`);
-
-    // 5. The "Raw Fetch" to Google (No SDKs required)
-    // Use gemini-2.5-flash (fast and available) or fallback to gemini-flash-latest
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"; // Fast and available model
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
-    console.log(`Using model: ${model}`);
-
-    // Construct the prompt based on mode
-    let systemPrompt = "";
-    let userPrompt = "";
-
-    if (mode === 'reflection9') {
-      systemPrompt = "You are a therapist. Reply ONLY with valid JSON keys: hypothesis, theme, approaches, theoreticalBase, reasoning, safeguarding, workerReflection, selfCare, claritySnapshot.";
-      userPrompt = `Analyze this text: ${text}`;
-    } else {
-      systemPrompt = "You are a helpful summarizer.";
-      userPrompt = `Summarize this text: ${text}`;
-    }
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\n" + userPrompt }]
-        }],
-        generationConfig: {
-          temperature: 0.4
+        if (!response.ok) {
+           const errText = await response.text();
+           console.warn(`Model ${model} failed: ${response.status} - ${errText}`);
+           lastError = `${model}: ${response.status} ${errText}`;
+           continue; // Try next model
         }
-      })
-    });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Google API Error:", errText);
-      throw new Error(`Google API Error: ${response.status} - ${errText}`);
-    }
+        const data = await response.json()
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}"
+        
+        // Success!
+        if (mode === "reflection9") {
+             const cleanJson = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+             return res.status(200).json({ reflection: JSON.parse(cleanJson) })
+        }
+        return res.status(200).json({ summary: raw })
 
-    const data = await response.json();
-    
-    // Extract text safely
-    let outputText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-
-    // If needing JSON (reflection9), parse it
-    if (mode === 'reflection9') {
-      // Clean markdown code blocks if present
-      outputText = outputText.replace(/```json/g, '').replace(/```/g, '').trim();
-      try {
-        const jsonOutput = JSON.parse(outputText);
-        return res.status(200).json({ reflection: jsonOutput });
-      } catch (e) {
-        console.error("AI JSON Parse Failed", outputText);
-        return res.status(500).json({ error: "AI produced invalid JSON", raw: outputText });
+      } catch (e: any) {
+        console.error(`Error with ${model}:`, e);
+        lastError = e?.message || String(e);
       }
     }
 
-    // Default return (summary)
-    return res.status(200).json({ summary: outputText });
+    throw new Error(`All models failed. Last error: ${lastError}`);
 
-  } catch (error: any) {
-    console.error("Critical Handler Error:", error);
-    return res.status(500).json({ 
-      error: error.message, 
-      stack: error.stack 
-    });
+  } catch (err: any) {
+    console.error("🔥 FINAL CRASH:", err)
+    return res.status(500).json({ error: err.message || "Internal Server Error" })
   }
 }
